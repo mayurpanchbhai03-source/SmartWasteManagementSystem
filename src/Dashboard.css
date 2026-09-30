@@ -229,6 +229,7 @@
 @keyframes panel-pop { from { opacity: 0; transform: translateY(-5px) scale(.985); } to { opacity: 1; transform: translateY(0) scale(1); } }
 
 @media (min-width: 1500px) { .map-frame { height: 426px; } }
+@media (max-width: 920px) { .metrics-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 1050px) {
   .topbar { gap: 32px; }
   .main-content { padding-top: 30px; }

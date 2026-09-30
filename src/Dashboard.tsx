@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { MapContainer, Marker, Popup, TileLayer, ZoomControl, useMap, useMapEvents } from 'react-leaflet'
 import L from 'leaflet'
 import {
-  ArrowDownRight, ArrowUpRight, Bell, Camera, Check, ChevronDown, Clock3, Crosshair,
+  ArrowUpRight, Bell, Camera, Check, ChevronDown, Clock3, Crosshair,
   Filter, LocateFixed, MapPin, Menu, Plus, Recycle, Search, Send, ShieldCheck,
   Sparkles, Trash2, X,
 } from 'lucide-react'
@@ -170,6 +170,10 @@ function Dashboard() {
   const openCount = reports.filter((report) => report.status !== 'Resolved').length
   const urgentCount = reports.filter((report) => report.status !== 'Resolved' && report.severity === 'High').length
   const resolvedCount = reports.filter((report) => report.status === 'Resolved').length
+  const responseTimes = reports.flatMap((report) => report.responseMinutes === undefined ? [] : [report.responseMinutes])
+  const averageResponseTime = responseTimes.length
+    ? Math.round(responseTimes.reduce((total, minutes) => total + minutes, 0) / responseTimes.length)
+    : null
   const visibleReports = useMemo(() => reports.filter((report) => {
     const matchesFilter = filter === 'All reports' || (filter === 'Open' ? report.status !== 'Resolved' : report.status === 'Resolved')
     const query = search.trim().toLowerCase()
@@ -409,15 +413,15 @@ function Dashboard() {
           </article>
           <article className="metric-card">
             <div className="metric-top"><span>Avg. response time</span><span className="metric-icon metric-icon--blue"><Clock3 size={16} /></span></div>
-            <div className="metric-value">{supabase ? '—' : '34'}<span className="metric-unit">min</span>{!supabase && <span className="metric-trend metric-trend--good"><ArrowDownRight size={14} /> 8%</span>}</div>
-            <div className="metric-caption">{supabase ? 'Needs response-time data' : 'faster this week'}</div>
-            <div className="metric-bar"><i style={{ width: supabase ? '0%' : '72%' }} /></div>
+            <div className={`metric-value${averageResponseTime === null ? ' metric-value--empty' : ''}`}>{averageResponseTime === null ? 'Not recorded' : <>{averageResponseTime}<span className="metric-unit">min</span></>}</div>
+            <div className="metric-caption">{averageResponseTime === null ? resolvedCount ? 'No resolution times recorded' : 'Awaiting the first resolved report' : `Average of ${responseTimes.length} completed reports`}</div>
+            <div className="metric-bar"><i style={{ width: averageResponseTime === null ? '0%' : `${Math.min(100, Math.max(8, 100 - averageResponseTime))}%` }} /></div>
           </article>
           <article className="metric-card">
             <div className="metric-top"><span>Resolved reports</span><span className="metric-icon metric-icon--green"><Check size={16} /></span></div>
-            <div className="metric-value">{String(resolvedCount + (supabase ? 0 : 18)).padStart(2, '0')}{!supabase && <span className="metric-trend metric-trend--good"><ArrowUpRight size={14} /> 6%</span>}</div>
-            <div className="metric-caption">{supabase ? `Live records · ${city}` : 'of 24 daily target'}</div>
-            <div className="metric-bar metric-bar--green"><i style={{ width: supabase ? '0%' : '76%' }} /></div>
+            <div className="metric-value">{resolvedCount}</div>
+            <div className="metric-caption">{resolvedCount ? supabase ? `Completed in ${city}` : 'Sample completed reports' : 'No reports resolved yet'}</div>
+            <div className="metric-bar metric-bar--green"><i style={{ width: `${Math.min(100, resolvedCount * 10)}%` }} /></div>
           </article>
           <article className="metric-card metric-card--alert">
             <div className="metric-top"><span>Needs attention</span><span className="metric-icon metric-icon--coral"><ShieldCheck size={16} /></span></div>

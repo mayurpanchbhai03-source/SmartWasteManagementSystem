@@ -33,9 +33,11 @@ export default defineConfig([
   ## Connect Supabase
 
   1. Create a Supabase project.
-  2. Open the project's SQL Editor and run [`supabase/migrations/202609300001_reports.sql`](supabase/migrations/202609300001_reports.sql).
+  2. Open the project's SQL Editor and run the files in `supabase/migrations/` in filename order. Run any newly added migration there too.
   3. Copy `.env.example` to `.env.local` and fill in the project URL and **publishable** key from Supabase API settings.
   4. Restart Vite. The app will load stored reports and subscribe to city-filtered changes.
+
+  The migration `202609300002_report_resolution_times.sql` records when a report changes to `Resolved`. The average response-time card only shows a value after a completed report has a recorded resolution time; older reports are not assigned invented durations.
 
   Only the Supabase publishable key belongs in `VITE_SUPABASE_PUBLISHABLE_KEY`. Never put a Supabase secret or service-role key in a `VITE_` variable or browser code.
 

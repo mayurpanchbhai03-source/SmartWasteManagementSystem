@@ -14,6 +14,7 @@ export type Report = {
   position: Coordinates
   image?: string
   authority: string
+  responseMinutes?: number
 }
 
 type ReportRecord = {
@@ -29,6 +30,7 @@ type ReportRecord = {
   authority: string
   photo_path: string | null
   created_at: string
+  resolved_at: string | null
 }
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
@@ -74,6 +76,10 @@ function relativeTime(value: string) {
 }
 
 export function fromReportRecord(record: ReportRecord): Report {
+  const responseMinutes = record.resolved_at
+    ? Math.max(0, Math.round((new Date(record.resolved_at).getTime() - new Date(record.created_at).getTime()) / 60_000))
+    : undefined
+
   return {
     id: record.id,
     category: record.category,
@@ -85,6 +91,7 @@ export function fromReportRecord(record: ReportRecord): Report {
     position: [record.latitude, record.longitude],
     image: record.photo_path ? supabase?.storage.from('report-photos').getPublicUrl(record.photo_path).data.publicUrl : undefined,
     authority: record.authority,
+    responseMinutes,
   }
 }
 
