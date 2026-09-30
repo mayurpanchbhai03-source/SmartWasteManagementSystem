@@ -34,7 +34,25 @@ type ReportRecord = {
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
 const supabasePublishableKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY
 
-export const supabase = supabaseUrl && supabasePublishableKey
+const hasSupabaseValues = Boolean(supabaseUrl && supabasePublishableKey)
+const isPlaceholderConfig = supabaseUrl?.includes('your-project-id')
+  || supabasePublishableKey === 'your-supabase-publishable-key'
+let isValidSupabaseUrl = false
+
+if (supabaseUrl && !isPlaceholderConfig) {
+  try {
+    const parsedUrl = new URL(supabaseUrl)
+    isValidSupabaseUrl = parsedUrl.protocol === 'https:' && parsedUrl.hostname.includes('.')
+  } catch {
+    isValidSupabaseUrl = false
+  }
+}
+
+export const supabaseConfigWarning = hasSupabaseValues && (isPlaceholderConfig || !isValidSupabaseUrl)
+  ? 'Supabase still has template or invalid settings. Put your real project URL and publishable key in .env.local, then restart the dev server.'
+  : ''
+
+export const supabase = hasSupabaseValues && isValidSupabaseUrl && !isPlaceholderConfig
   ? createClient(supabaseUrl, supabasePublishableKey)
   : null
 

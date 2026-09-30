@@ -6,7 +6,7 @@ import {
   Filter, LocateFixed, MapPin, Menu, Plus, Recycle, Search, Send, ShieldCheck,
   Sparkles, Trash2, X,
 } from 'lucide-react'
-import { createCityReport, loadCityReports, subscribeToCityReports, supabase } from './lib/reports'
+import { createCityReport, loadCityReports, subscribeToCityReports, supabase, supabaseConfigWarning } from './lib/reports'
 import type { Coordinates, Report } from './lib/reports'
 import 'leaflet/dist/leaflet.css'
 import './Dashboard.css'
@@ -142,7 +142,7 @@ function Dashboard() {
   const [city, setCity] = useState('New Delhi')
   const [reports, setReports] = useState(supabase ? [] : cities['New Delhi'].reports)
   const [databaseStatus, setDatabaseStatus] = useState<'demo' | 'connecting' | 'connected' | 'error'>(supabase ? 'connecting' : 'demo')
-  const [databaseError, setDatabaseError] = useState('')
+  const [databaseError, setDatabaseError] = useState(supabaseConfigWarning)
   const [filter, setFilter] = useState<ReportFilter>('All reports')
   const [search, setSearch] = useState('')
   const [activeNav, setActiveNav] = useState('Overview')
@@ -360,7 +360,7 @@ function Dashboard() {
         </section>
 
         {notice && <div className="toast" role="status"><span className="toast-check"><Check size={16} /></span><span><strong>{supabase ? `Report saved for ${notice}` : `Demo report created for ${notice}`}</strong><small>{supabase ? 'Database updated. Municipal alerts are not configured.' : 'Demo only. No real authority alert was sent.'}</small></span><button className="icon-button toast-close" aria-label="Dismiss notification" onClick={() => setNotice('')}><X size={16} /></button></div>}
-        {databaseError && <div className="backend-alert" role="alert"><ShieldCheck size={16} /><span>{databaseError}</span></div>}
+        {(supabaseConfigWarning || databaseError) && <div className="backend-alert" role="alert"><ShieldCheck size={16} /><span>{supabaseConfigWarning || databaseError}</span></div>}
 
         <section className="workspace-grid">
           <div className="map-panel">
