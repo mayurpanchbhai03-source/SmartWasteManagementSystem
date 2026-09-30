@@ -38,21 +38,25 @@ const hasSupabaseValues = Boolean(supabaseUrl && supabasePublishableKey)
 const isPlaceholderConfig = supabaseUrl?.includes('your-project-id')
   || supabasePublishableKey === 'your-supabase-publishable-key'
 let isValidSupabaseUrl = false
+let usesIncorrectSupabaseDomain = false
 
 if (supabaseUrl && !isPlaceholderConfig) {
   try {
     const parsedUrl = new URL(supabaseUrl)
+    usesIncorrectSupabaseDomain = parsedUrl.hostname.endsWith('.supabase.com')
     isValidSupabaseUrl = parsedUrl.protocol === 'https:' && parsedUrl.hostname.includes('.')
   } catch {
     isValidSupabaseUrl = false
   }
 }
 
-export const supabaseConfigWarning = hasSupabaseValues && (isPlaceholderConfig || !isValidSupabaseUrl)
-  ? 'Supabase still has template or invalid settings. Put your real project URL and publishable key in .env.local, then restart the dev server.'
+export const supabaseConfigWarning = hasSupabaseValues && usesIncorrectSupabaseDomain
+  ? 'This Supabase URL ends in .supabase.com. Use your project API URL ending in .supabase.co, then restart the dev server.'
+  : hasSupabaseValues && (isPlaceholderConfig || !isValidSupabaseUrl)
+    ? 'Supabase still has template or invalid settings. Put your real project URL and publishable key in .env.local, then restart the dev server.'
   : ''
 
-export const supabase = hasSupabaseValues && isValidSupabaseUrl && !isPlaceholderConfig
+export const supabase = hasSupabaseValues && isValidSupabaseUrl && !isPlaceholderConfig && !usesIncorrectSupabaseDomain
   ? createClient(supabaseUrl, supabasePublishableKey)
   : null
 
