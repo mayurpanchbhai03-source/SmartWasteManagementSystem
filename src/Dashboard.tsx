@@ -148,6 +148,10 @@ function Dashboard() {
   const [activeNav, setActiveNav] = useState('Overview')
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [modalOpen, setModalOpen] = useState(false)
+  const [notificationsOpen, setNotificationsOpen] = useState(false)
+  const [readNotificationIds, setReadNotificationIds] = useState<string[]>(() =>
+    supabase ? [] : cities['New Delhi'].reports.map((report) => report.id),
+  )
   const [notice, setNotice] = useState('')
   const [location, setLocation] = useState<Coordinates>(cities['New Delhi'].center)
   const [locationLabel, setLocationLabel] = useState('New Delhi, India · Map center')
@@ -160,6 +164,7 @@ function Dashboard() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const photoInput = useRef<HTMLInputElement>(null)
   const searchInput = useRef<HTMLInputElement>(null)
+  const notificationsRef = useRef<HTMLDivElement>(null)
   const cityConfig = cities[city]
 
   const openCount = reports.filter((report) => report.status !== 'Resolved').length
@@ -170,10 +175,18 @@ function Dashboard() {
     const query = search.trim().toLowerCase()
     return matchesFilter && (!query || `${report.title} ${report.address} ${report.id} ${report.category}`.toLowerCase().includes(query))
   }), [filter, reports, search])
+  const activityNotifications = reports.slice(0, 8).map((report) => ({
+    ...report,
+    heading: report.status === 'Resolved' ? 'Cleanup completed' : report.status === 'In progress' ? 'Cleanup in progress' : 'New waste report',
+  }))
+  const unreadNotificationCount = activityNotifications.filter((item) => !readNotificationIds.includes(item.id)).length
 
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
-      if (event.key === 'Escape') setModalOpen(false)
+      if (event.key === 'Escape') {
+        setModalOpen(false)
+        setNotificationsOpen(false)
+      }
       if (event.key.toLowerCase() === 'n' && !event.metaKey && !event.ctrlKey && !event.altKey && !['INPUT', 'TEXTAREA', 'SELECT'].includes((event.target as HTMLElement).tagName)) setModalOpen(true)
       if (event.key === '/' && !['INPUT', 'TEXTAREA', 'SELECT'].includes((event.target as HTMLElement).tagName)) {
         event.preventDefault()
@@ -181,7 +194,14 @@ function Dashboard() {
       }
     }
     window.addEventListener('keydown', onKeyDown)
-    return () => window.removeEventListener('keydown', onKeyDown)
+    function onPointerDown(event: PointerEvent) {
+      if (notificationsRef.current && !notificationsRef.current.contains(event.target as Node)) setNotificationsOpen(false)
+    }
+    window.addEventListener('pointerdown', onPointerDown)
+    return () => {
+      window.removeEventListener('keydown', onKeyDown)
+      window.removeEventListener('pointerdown', onPointerDown)
+    }
   }, [])
 
   useEffect(() => {
@@ -193,13 +213,17 @@ function Dashboard() {
     void loadCityReports(city).then((loadedReports) => {
       if (!active) return
       setReports(loadedReports)
+      setReadNotificationIds((current) => Array.from(new Set([...current, ...loadedReports.map((report) => report.id)])))
       setDatabaseStatus('connected')
       unsubscribe = subscribeToCityReports(city, (event, report, id) => {
         if (event === 'DELETE' && id) {
           setReports((current) => current.filter((item) => item.id !== id))
           return
         }
-        if (report) setReports((current) => [report, ...current.filter((item) => item.id !== report.id)])
+        if (report) {
+          setReports((current) => [report, ...current.filter((item) => item.id !== report.id)])
+          setReadNotificationIds((current) => current.filter((readId) => readId !== report.id))
+        }
       }, (status) => {
         if (!active) return
         if (status === 'SUBSCRIBED') setDatabaseStatus('connected')
@@ -268,11 +292,13 @@ function Dashboard() {
       if (supabase) {
         const savedReport = await createCityReport({ ...reportInput, photo: photoFile || undefined })
         setReports((current) => [savedReport, ...current.filter((item) => item.id !== savedReport.id)])
+        setReadNotificationIds((current) => current.filter((readId) => readId !== savedReport.id))
         reportId = savedReport.id
         setNotice(authority)
       } else {
         const demoReport: Report = { ...reportInput, id: `CW-${Date.now().toString().slice(-6)}`, created: 'Just now', status: 'Assigned', image: photo || undefined }
         setReports((current) => [demoReport, ...current])
+        setReadNotificationIds((current) => current.filter((readId) => readId !== demoReport.id))
         reportId = demoReport.id
         setNotice(authority)
       }
@@ -317,7 +343,49 @@ function Dashboard() {
             setNotice('')
             setDatabaseError('')
           }}>{Object.keys(cities).map((name) => <option key={name} value={name}>{name}</option>)}</select><ChevronDown size={14} /></label>
-          <button className="icon-button notification-button" aria-label="Notifications"><Bell size={18} /><i /></button>
+          <div className="notification-wrap" ref={notificationsRef} onKeyDown={(event) => { if (event.key === 'Escape') setNotificationsOpen(false) }}>
+            <button
+              className={`icon-button notification-button${notificationsOpen ? ' notification-button--open' : ''}`}
+              aria-label={unreadNotificationCount ? `Notifications, ${unreadNotificationCount} unread` : 'Notifications'}
+              aria-expanded={notificationsOpen}
+              aria-controls="notifications-panel"
+              onClick={() => setNotificationsOpen((open) => !open)}
+            >
+              <Bell size={18} />
+              {unreadNotificationCount > 0 && <span className="notification-count">{unreadNotificationCount > 9 ? '9+' : unreadNotificationCount}</span>}
+            </button>
+            {notificationsOpen && <section className="notifications-panel" id="notifications-panel" aria-label="Notifications">
+              <div className="notifications-header">
+                <div><strong>Activity</strong><span>{unreadNotificationCount ? `${unreadNotificationCount} unread` : 'All caught up'}</span></div>
+                <div className="notification-header-actions">
+                  <button className="mark-read-button" disabled={!unreadNotificationCount} onClick={() => setReadNotificationIds((current) => Array.from(new Set([...current, ...activityNotifications.map((item) => item.id)])))}>Mark all read</button>
+                  <button className="icon-button notification-close" aria-label="Close notifications" onClick={() => setNotificationsOpen(false)}><X size={15} /></button>
+                </div>
+              </div>
+              <div className="notifications-list">
+                {activityNotifications.length ? activityNotifications.map((item) => {
+                  const isUnread = !readNotificationIds.includes(item.id)
+                  return <button
+                    className={`notification-item${isUnread ? ' notification-item--unread' : ''}`}
+                    key={item.id}
+                    onClick={() => {
+                      setReadNotificationIds((current) => current.includes(item.id) ? current : [...current, item.id])
+                      setSelectedId(item.id)
+                      setFilter('All reports')
+                      setSearch('')
+                      setActiveNav('Reports')
+                      setNotificationsOpen(false)
+                    }}
+                  >
+                    <span className={`notification-severity notification-severity--${item.severity.toLowerCase()}`}><MapPin size={14} /></span>
+                    <span className="notification-copy"><strong>{item.heading}</strong><span>{item.title}</span><small>{item.address} · {item.authority}</small></span>
+                    <span className="notification-trailing"><small>{item.created}</small>{isUnread && <i />}</span>
+                  </button>
+                }) : <div className="notifications-empty"><Bell size={18} /><strong>No activity yet</strong><span>New reports will show up here.</span></div>}
+              </div>
+              <div className="notifications-footer"><span>{city} operations</span><span className={`connection-indicator connection-indicator--${databaseStatus}`}><i /> {databaseStatus === 'connected' ? 'Live' : databaseStatus === 'demo' ? 'Demo' : databaseStatus === 'error' ? 'Offline' : 'Syncing'}</span></div>
+            </section>}
+          </div>
           <div className="avatar" aria-label="Signed in as Mayur">M</div>
         </div>
       </header>
